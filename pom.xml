@@ -33,6 +33,7 @@
       <!-- Plugin versions -->
       <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
       <maven-clean-plugin.version>3.4.0</maven-clean-plugin.version>
+      <maven-scm-plugin.version>2.0.1</maven-scm-plugin.version>
       <openapi-generator-maven-plugin.version>7.7.0</openapi-generator-maven-plugin.version>
       <versions-maven-plugin.version>2.17.1</versions-maven-plugin.version>
    </properties>
@@ -95,11 +96,11 @@
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-scm-plugin</artifactId>
-            <version>2.0.1</version>
+            <version>${maven-scm-plugin.version}</version>
             <executions>
                <execution>
                   <id>clone-sldt-semantic-models</id>
-                  <phase>generate-test-resources</phase>
+                  <phase>initialize</phase>
                   <goals>
                      <goal>checkout</goal>
                   </goals>
