@@ -125,7 +125,7 @@
             </configuration>
          </plugin>
 
-         <!-- Generates Java Code for Aspect Models -->
+         <!-- Generates artifacts for Aspect Models -->
          <plugin>
             <groupId>org.eclipse.esmf</groupId>
             <artifactId>esmf-aspect-model-maven-plugin</artifactId>
@@ -183,6 +183,7 @@
                      <aspectResourcePath>/part-as-planned</aspectResourcePath>
                      <outputDirectory>${generated-sources}/main/resources</outputDirectory>
                      <outputFormat>yaml</outputFormat>
+                     <excludePaging>true</excludePaging>
                   </configuration>
                </execution>
 

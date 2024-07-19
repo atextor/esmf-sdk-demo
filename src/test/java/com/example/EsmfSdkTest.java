@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,13 +21,20 @@ import org.eclipse.esmf.aspectmodel.resolver.ResolutionStrategy;
 import org.eclipse.esmf.aspectmodel.urn.AspectModelUrn;
 import org.eclipse.esmf.metamodel.Aspect;
 import org.eclipse.esmf.metamodel.AspectModel;
+import org.eclipse.esmf.metamodel.ModelElement;
+import org.eclipse.esmf.staticmetamodel.constraint.StaticConstraintProperty;
+import org.eclipse.esmf.staticmetamodel.propertychain.PropertyChain;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.catenax.part_as_planned.MetaPartAsPlanned;
+import io.catenax.part_as_planned.MetaPartTypeInformationEntity;
 import io.catenax.part_as_planned.PartAsPlanned;
+import io.catenax.part_as_planned.PartTypeInformationEntity;
 import org.junit.jupiter.api.Test;
 
 public class EsmfSdkTest {
@@ -118,16 +124,87 @@ public class EsmfSdkTest {
       final Aspect aspect = aspectModel.aspects().stream().filter( a -> a.urn().equals( aspectUrn ) ).findFirst().orElseThrow();
 
       final AspectModelDocumentationGenerator generator = new AspectModelDocumentationGenerator( aspect );
-      generator.generate( htmlFileName -> {
-         try {
-            final File output = new File( System.getProperty( "user.dir" ) ).toPath()
-                  .resolve( "target" )
-                  .resolve( htmlFileName )
-                  .toFile();
-            return new FileOutputStream( output );
-         } catch ( final FileNotFoundException e ) {
-            throw new RuntimeException( e );
+      final File output = new File( System.getProperty( "user.dir" ) ).toPath()
+            .resolve( "target" )
+            .resolve( "PartAsPlanned.html" )
+            .toFile();
+      try ( final FileOutputStream outputStream = new FileOutputStream( output ) ) {
+         generator.generate( htmlFileName -> outputStream, Map.of(), Locale.ENGLISH );
+      }
+      assertThat( output ).exists();
+      assertThat( output ).isFile();
+   }
+
+   @Test
+   void useStaticMetaClass() {
+      // Access the information from the model in a type-safe way
+      new MetaPartAsPlanned().getProperties().forEach( property -> {
+         System.out.println( "Property " + property.getName() + ": " );
+         System.out.println( "  is complex type: " + property.isComplexType() );
+         System.out.println( "  is optional as used here: " + property.isOptional() );
+         System.out.println( "  containing type: " + property.getContainingType() );
+         System.out.println( "  characteristic URN: " + property.getCharacteristic().map( ModelElement::urn )
+               .map( AspectModelUrn::toString ).orElse( "" ) );
+         if ( property instanceof final StaticConstraintProperty<?, ?, ?> constraintProperty ) {
+            constraintProperty.getConstraints().forEach( constraint -> {
+               System.out.println( "  constraint: " + constraint.toString() );
+            } );
          }
-      }, Map.of(), Locale.ENGLISH );
+         System.out.println();
+      } );
+
+      // But we can also statically refer to single elements:
+      System.out.println( "catenaXId's Characteristic: " + MetaPartAsPlanned.CATENA_X_ID.getCharacteristic() );
+   }
+
+   @Test
+   void deserializeAndUseData() throws JsonProcessingException {
+      final String data = """
+            {
+              "partTypeInformation" : {
+                "classification" : "product",
+                "manufacturerPartId" : "123-0.740-3434-A",
+                "nameAtManufacturer" : "Mirror left"
+              },
+              "partSitesInformationAsPlanned" : [ {
+                "functionValidUntil" : "2024-07-19T08:19:46.729+02:00",
+                "catenaXsiteId" : "BPNS1234567890ZZ",
+                "function" : "production",
+                "functionValidFrom" : "2024-07-19T08:19:46.729+02:00"
+              } ],
+              "catenaXId" : "580d3adf-1981-44a0-a214-13d6ceed9379"
+            }
+            """;
+
+      final ObjectMapper mapper = new ObjectMapper();
+      mapper.registerModule( new JavaTimeModule() );
+      mapper.registerModule( new Jdk8Module() );
+      mapper.registerModule( new AspectModelJacksonModule() );
+      mapper.configure( JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true );
+      mapper.configure( SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false );
+      mapper.configure( SerializationFeature.FAIL_ON_EMPTY_BEANS, false );
+
+      // Parse the data into the type safe representation
+      final PartAsPlanned partAsPlanned = mapper.readValue( data, PartAsPlanned.class );
+
+      // Statically construct accessors for nested information
+      final PropertyChain<PartAsPlanned, String> getManufacturerPartId =
+            PropertyChain.from( MetaPartAsPlanned.PART_TYPE_INFORMATION )
+                  .to( MetaPartTypeInformationEntity.MANUFACTURER_PART_ID );
+      System.out.printf( "%s/%s: %s%n",
+            MetaPartAsPlanned.PART_TYPE_INFORMATION.getName(),
+            MetaPartTypeInformationEntity.MANUFACTURER_PART_ID.getName(),
+            getManufacturerPartId.getValue( partAsPlanned ) );
+
+      // Iterate values of properties in a type-safe an generic way: All you need to provide to this snippet
+      // is the instance of the data class
+      MetaPartAsPlanned.INSTANCE.getProperties().forEach( staticProperty -> {
+         System.out.println( staticProperty.getName() + ": " + staticProperty.getValue( partAsPlanned ) );
+      } );
+      final PartTypeInformationEntity partTypeInformationEntity = MetaPartAsPlanned.PART_TYPE_INFORMATION.getValue( partAsPlanned );
+      MetaPartTypeInformationEntity.INSTANCE.getProperties().forEach( staticProperty -> {
+         System.out.println(
+               "partTypeInformationEntity/" + staticProperty.getName() + ": " + staticProperty.getValue( partTypeInformationEntity ) );
+      } );
    }
 }

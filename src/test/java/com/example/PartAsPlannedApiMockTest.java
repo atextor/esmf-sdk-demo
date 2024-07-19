@@ -23,7 +23,7 @@ public class PartAsPlannedApiMockTest {
    @BeforeEach
    void setup() {
       server = new WireMockServer( options().port( port ) );
-      server.stubFor( PartAsPlannedApiMockServer.stubGetPartAsPlanned200( "0", "1", "1",
+      server.stubFor( PartAsPlannedApiMockServer.stubGetPartAsPlanned200(
             PartAsPlannedApiMockServer.getPartAsPlanned200ResponseSample1() ) );
       server.start();
    }
@@ -37,16 +37,17 @@ public class PartAsPlannedApiMockTest {
    @Test
    void testPartAsPlannedApiMock() throws URISyntaxException, IOException, InterruptedException {
       final HttpRequest request = HttpRequest
-            .newBuilder( new URI( "http://localhost:" + port + "/part-as-planned?start=0&count=1&totalItemCount=1" ) )
+            .newBuilder( new URI( "http://localhost:" + port + "/part-as-planned" ) )
             .headers( "Accept", "application/json" )
             .GET().build();
       final HttpClient httpClient = HttpClient.newHttpClient();
       final HttpResponse<String> response = httpClient
             .send( request, HttpResponse.BodyHandlers.ofString() );
 
-      final ObjectMapper objectMapper = new ObjectMapper();
-      final Object jsonResponse = objectMapper.readValue( response.body(), Object.class );
+      // Render the received JSON
+      final ObjectMapper mapper = new ObjectMapper();
+      final Object jsonResponse = mapper.readValue( response.body(), Object.class );
       System.out.println( "Received from mock server:" );
-      System.out.println( objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString( jsonResponse ) );
+      System.out.println( mapper.writerWithDefaultPrettyPrinter().writeValueAsString( jsonResponse ) );
    }
 }
